@@ -1,7 +1,8 @@
 
 import bcrypt from "bcrypt"
-export const bcryptPssword = ({textPlan , rounds=12}={})=>{
-    return bcrypt.hashSync(textPlan , rounds)
+import { ROUNDS } from "../../../../config/config.service.js"
+export const bcryptPssword = ({textPlan , rounds=ROUNDS}={})=>{
+    return bcrypt.hashSync(textPlan , Number(rounds))
 }
 
 

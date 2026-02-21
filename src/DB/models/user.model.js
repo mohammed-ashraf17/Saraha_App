@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { genderEnum, providerEnum } from "../../common/enum/user.enum.js";
+import { genderEnum, providerEnum, rolesEnum } from "../../common/enum/user.enum.js";
 
 
 const userSchema = new mongoose.Schema(
@@ -10,7 +10,7 @@ const userSchema = new mongoose.Schema(
             required:true,
             trim:true,
             minLength:3,
-            maxLength:8
+            maxLength:20
             
         },
            lastName:
@@ -19,7 +19,7 @@ const userSchema = new mongoose.Schema(
             required:true,
             trim:true,
             minLength:3,
-            maxLength:8
+            maxLength:20
         },
         email:
         {
@@ -32,7 +32,10 @@ const userSchema = new mongoose.Schema(
         password:
         {
             type:String,
-            required:true,
+            required:function()
+            {
+                return this.provider == providerEnum.google ? false : true
+            },
             trim:true,
             minLength:7,
            
@@ -48,10 +51,19 @@ const userSchema = new mongoose.Schema(
             default:providerEnum.system
            
         },
+           roles:{
+            type:String,
+            enum:Object.values(rolesEnum),
+            default:rolesEnum.user
+           
+        },
         phone:
         {
             type:String,
-            required: true,
+            required:function()
+            {
+                return this.provider == providerEnum.google ? false : true
+            },
             min:11,
             max:12,
 
@@ -80,6 +92,7 @@ userSchema.virtual("userName")
   this.lastName = v.split(" ")[1]
 })
 
-const userModel = mongoose.models.user || mongoose.model("user" , userSchema)
 
+const userModel = mongoose.models.user || mongoose.model("user" , userSchema)
+userModel.syncIndexes()
 export default userModel

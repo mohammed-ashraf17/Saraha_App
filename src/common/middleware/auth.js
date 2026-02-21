@@ -10,14 +10,22 @@ export const authentication = async (req , res , next)=>{
     {
         throw new Error("token not exist" , {cause:403});
     }
-    const decoded= verifyToken({token:auth})
+
+    const [perfix , token] = auth.split(" ")
+    if(perfix !== "bearer")
+    {
+        throw new Error("inValid Token perfix");
+
+    }
+    const decoded= verifyToken({token})
 
     if(!decoded || !decoded?.userId)
     {
         throw new Error("inValid Token");
     }
 
-      const user = await db_service.findOne({model:userModel , check:{_id:decoded.userId} , select:"-password" })
+      const user = await db_service.findOne({model:userModel , 
+        check:{_id:decoded.userId} , select:"-password" })
 
      if(!user)
     {
