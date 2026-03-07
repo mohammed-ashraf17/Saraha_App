@@ -1,24 +1,37 @@
 import joi from "joi"
 import { genderEnum } from "../../common/enum/user.enum.js"
+import { GeneralRules } from "../../common/utils/generalRuels.js"
 
 
 export const signUpSchema = {
     body:joi.object(
     {
-        userName:joi.string().min(5).max(40).required(),
-        email:joi.string().required().email({tlds:{allow:['com' , 'net']}}),
-        password:joi.string().required().pattern(new RegExp(/^[a-z]{5}[0-9]{7}$/)),
-        cPassword:joi.string().required().valid(joi.ref("password")),
-        phone:joi.string().required().pattern(new RegExp(/^[0-9]{11}$/)),
-        age:joi.number().min(18).max(60),
+        userName:GeneralRules.userName.required(),
+        email:GeneralRules.email.required(),
+        password:GeneralRules.password.required(),
+        cPassword:GeneralRules.cPassword.required(),
+        phone:GeneralRules.phone.required(),
+        age:GeneralRules.age,
         gender:joi.string().valid(genderEnum.female , genderEnum.male)
 
     }).required(),
 
-    query:joi.object(
-    {
-        x:joi.number().min(5)
-    })
+    /*--------------single--------------*/
+    
+    file: GeneralRules.file.required(),
+
+    /*--------------array--------------*/
+
+    // files:joi.array().items(GeneralRules.file.required()).required(),
+
+    /*--------------fields--------------*/
+
+//     files:joi.object(
+//         {
+//             avatar:joi.array().items(GeneralRules.file.required()).required(),
+//             avatars:joi.array().items(GeneralRules.file.required()).required(),
+// }).required(),
+
 }
 
 
@@ -26,13 +39,40 @@ export const signInSchema =
 {
     body:joi.object(
     {
-        email:joi.string().required().email({tlds:{allow:['com' , 'net']}}),
-        password:joi.string().required().pattern(new RegExp(/^[a-z]{5}[0-9]{7}$/)),
-        cPassword:joi.string().required().valid(joi.ref("password")),
+        email:GeneralRules.email.required(),
+        password:GeneralRules.password.required(),
+        cPassword:GeneralRules.cPassword.required(),
     }).required(),
-
-   query:joi.object(
-    {
-        x:joi.number().min(5)
-    })
 }
+
+export const shareProfileSchema = 
+{
+    params:joi.object(
+    {
+        userId:GeneralRules.userId.required()
+    }).required(),
+}
+
+export const updateProfileSchema = 
+{
+    body:joi.object(
+    {
+        userName:GeneralRules.userName,
+        phone:GeneralRules.phone,
+        age:GeneralRules.age,
+    }).required(),
+}
+
+export const updatePasswordSchema = 
+{
+    body:joi.object(
+    {
+        oldPassword:GeneralRules.password.required(),
+        newPassword:GeneralRules.password.required(),
+        cPassword:joi.string().valid(joi.ref("newPassword")),
+    }).required(),
+}
+
+
+
+

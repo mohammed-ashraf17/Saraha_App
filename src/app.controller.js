@@ -12,6 +12,7 @@ const port = PORT
 const bootstrap = ()=>{
     app.use( cors(),express.json())
     checkConnectionDB()
+    app.use("/uploads" , express.static("uploads"))
 
 app.get("/" , (req , res , next)=>
 {

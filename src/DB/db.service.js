@@ -7,11 +7,16 @@ export const find = async ({model , filteration ={}}={})=>
 }
 export const findOne =async ({model,check ={} , select = ""}={})=>{
     return await model.findOne(check).select(select)
-     
+
 }
 
 export const create = async ({model , dataa ={}}={})=>
 {
-   return await model.create(dataa)
-      
+    return await model.create(dataa)
+}
+
+
+export const findOneAndUpdate = async({model , check = {} , update={}}={})=>
+{
+    return await model.findOneAndUpdate(check , update)
 }

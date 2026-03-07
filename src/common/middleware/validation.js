@@ -12,10 +12,13 @@
               if(error)
              {
                 errorResult.push(error.details)
+               //  console.log(error?.details);
              }
         }
                  if(errorResult.length>0)
                 {
+                  
+                  
                   return  res.status(400).json({message:"validation error",error:errorResult})
                 }
            next()
