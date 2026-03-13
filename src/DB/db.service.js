@@ -20,3 +20,8 @@ export const findOneAndUpdate = async({model , check = {} , update={}}={})=>
 {
     return await model.findOneAndUpdate(check , update)
 }
+
+export const deleteMany = async({model , check = {}}={})=>
+{
+    return await model.deleteMany(check)
+}

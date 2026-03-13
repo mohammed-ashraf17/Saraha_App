@@ -5,15 +5,19 @@ import { bcryptPssword, comparePssword } from "../../common/utils/security/hash.
 import successResponse from "../../common/utils/successes_response/succsses.response.js";
 import * as db_service from "../../DB/db.service.js"
 import userModel from "../../DB/models/user.model.js"
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID} from "crypto";
 import { generateToken, verifyToken } from "../../common/utils/token/token.service.js";
- import {OAuth2Client} from 'google-auth-library';
+import {OAuth2Client} from 'google-auth-library';
 import cloudinary from "../../common/utils/cloudinary.js";
 import fs from "node:fs"
 import { ACCESS_SEUCRIT_KEY, PERFIX, REFRESH_SEUCRIT_KEY } from "../../../config/config.service.js";
+import revokeTokenModel from "../../DB/models/revokeToken.model.js";
+import { deleteKey, get, get_keys, keys, revoke_key, set } from "../../DB/redis/redis.service.js";
 
 export const signUp = async (req , res , next)=>
 {
+    
+    
 let uploadedImage = null
 
 try {
@@ -26,6 +30,9 @@ if(password !== cPassword){
 
 if(await db_service.findOne({model:userModel , check:{_id:userId , provider:providerEnum.system}})){
     throw new Error("User NOT F0UND" , {cause:404})
+}
+if(!req.file){
+    throw new Error("avatar file is required")
 }
 
 const {secure_url , public_id} =await cloudinary.uploader.upload(req.file.path,{
@@ -122,30 +129,45 @@ export const signIn = async (req , res , next)=>
         throw new Error("InValid Password" , {cause:409});
     }
 
+    const jwtid = randomUUID()
     const access_token = generateToken({paylod:{userId : user._id} , 
         seucrit:ACCESS_SEUCRIT_KEY,
         options:{
-            expiresIn :5*60,
-            notBefore:1,
-            noTimestamp:true,
+            expiresIn : 60 * 3 ,
             issuer:"http://localhost:3001",
             audience:"http://localhost:4000",
-            jwtid:uuidv4()
+            jwtid
     }})
 
     const refresh_token = generateToken({paylod:{userId:user._id},
         seucrit:REFRESH_SEUCRIT_KEY,
         options:{
             expiresIn:"1y",
+            jwtid
         }})
     successResponse({res , data:{access_token , refresh_token}})
 }
 
 
-export const getProfileUser = async(req , res , next)=>
-{
-    successResponse({res , data:{...req.user._doc , phone:decrypt(req.user.phone)}})
+export const getProfileUser = async(req , res , next) => {
+    try {
+        const key = `profile :: ${req.user._id}`;
+        const userExist = await get({key}); 
+
+        if(userExist) {
+            console.log("1");
+            return successResponse({res , data:userExist});
+        }
+
+        console.log("2");
+        const userData = { ...req.user._doc, phone: decrypt(req.user.phone) };
+        await set({key, value: userData, ttl: 60*5});
+        successResponse({res , data: userData});
+    } catch (error) {
+        next(error);
+    }
 }
+
 
 export const refresh_token = async(req , res , next)=>
 {
@@ -177,7 +199,7 @@ export const refresh_token = async(req , res , next)=>
     const access_token = generateToken({paylod:{userId : user._id} , 
         seucrit:ACCESS_SEUCRIT_KEY,
         options:{
-            expiresIn :5*60,
+            expiresIn :60 * 3,
             notBefore:1,
             noTimestamp:true,
             issuer:"http://localhost:3001",
@@ -186,6 +208,7 @@ export const refresh_token = async(req , res , next)=>
     }})
     successResponse({res , data:{access_token}})
 }
+
 
 export const share_Profile = async(req , res , next)=>
 {
@@ -203,6 +226,7 @@ export const share_Profile = async(req , res , next)=>
     user.phone = decrypt(user.phone)
     successResponse({res , data:user})
 }
+
 
 export const update_Profile = async(req , res , next)=>
 {
@@ -223,8 +247,10 @@ export const update_Profile = async(req , res , next)=>
         throw new Error("user not found ", {cause:404});    
     }
     user.phone = decrypt(user.phone)
+    await deleteKey({key:`profile :: ${req.user._id}`})
     successResponse({res , data:user})
 }
+
 
 export const update_Password = async(req , res , next)=>
 {
@@ -237,5 +263,39 @@ export const update_Password = async(req , res , next)=>
     const hash = bcryptPssword({textPlan:newPassword})
     req.user.password = hash
     await req.user.save()
+    successResponse({res})
+}
+
+export const logout = async(req , res , next)=>
+{
+    const {flag} = req.query
+    if(flag === "all")
+    {
+        req.user.changeCredential = new Date()
+        await req.user.save()
+        await deleteKey(await keys(get_keys({userId:req.user._id})))
+
+        // await db_service.deleteMany({model:revokeTokenModel,
+        //     check:
+        //     {
+        //         userId:req.user._id
+        //     }
+        // })
+    }
+    else
+    {
+
+        await set({
+            key:revoke_key({userId:req.user._id , jti:req.decoded.jti}),
+            value:`${req.decoded.jti}`,
+            ttl:req.decoded.exp - Math.floor(Date.now()/1000)
+        })
+        // await db_service.create({model:revokeTokenModel ,
+        //     dataa:{
+        //         tokenId:req.decoded.jti,
+        //         userId:req.user._id,
+        //         expiredAt:new Date(req.decoded.exp *1000)
+        //     }})
+    }
     successResponse({res})
 }
