@@ -21,7 +21,8 @@ export const ACCESS_SEUCRIT_KEY = env.ACCESS_SEUCRIT_KEY
 export const REFRESH_SEUCRIT_KEY = env.REFRESH_SEUCRIT_KEY
 export const PERFIX = env.PERFIX
 export const REDIS_URL = env.REDIS_URL
-
+export const EMAIL = env.EMAIL
+export const PASSWORD = env.PASSWORD
 
 
 

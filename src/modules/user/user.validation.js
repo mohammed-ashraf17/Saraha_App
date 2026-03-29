@@ -60,6 +60,7 @@ export const updateProfileSchema =
         userName:GeneralRules.userName,
         phone:GeneralRules.phone,
         age:GeneralRules.age,
+        gender:joi.string().valid(genderEnum.female , genderEnum.male)
     }).required(),
 }
 
@@ -73,6 +74,24 @@ export const updatePasswordSchema =
     }).required(),
 }
 
+export const ConfirmeEmailSchema =
+{
+    body:joi.object(
+        {
+            email:GeneralRules.email.required(),
+            code:joi.string().length(6).required()
+        }
+    ).required()
+}
+
+export const resendOtpSchema =
+{
+    body:joi.object(
+        {
+            email:GeneralRules.email.required(),
+        }
+    ).required()
+}
 
 
 

@@ -2,13 +2,29 @@ import { redisClient } from "./redis.db.js"
 
 export const revoke_key = ({userId , jti}={})=>
 {
-    return `redis_token : ${userId}::${jti}`
+    return `redis_token::${userId}::${jti}`
 }
 
 export const get_keys = ({userId}={})=>
 {
-    return `redis_token : ${userId}`
+    return `redis_token::${userId}`
 }
+
+export const otp_key = ({email}={})=>
+{
+    return `otp::${email}`
+}
+
+export const max_otp_key = ({email}={})=>
+{
+    return `${otp_key({email})}::max`
+}
+
+export const block_otp_key = ({email}={})=>
+{
+    return `${otp_key({email})}::block`
+}
+
 
 export const set = async({key , value , ttl}={})=>
 {
@@ -23,7 +39,7 @@ export const set = async({key , value , ttl}={})=>
     }
 }
 
-export const update = async({key , value}={})=>
+export const update = async({key , value , ttl}={})=>
 {
     try {
         if(!await redisClient.exists(key))return 0
@@ -67,11 +83,11 @@ export const ttl = async ({key}={})=>
     }
 }
 
-
-
 export const deleteKey = async ({key}={})=>
 {
     try {
+
+        if(!key.length) return 0
         return await redisClient.del(key)
     } catch (error) {
         console.log("error to delete data in redis" , error);
@@ -94,5 +110,14 @@ export const keys = async ({pattern}={})=>
         return await redisClient.keys(`${pattern}*`)
     } catch (error) {
         console.log("error to get keys from redis" , error);
+    }
+}
+
+export const incr = async ({key}={})=>
+{
+    try {
+        return await redisClient.incr(key)
+    } catch (error) {
+        console.log("error to incr keys from redis" , error);
     }
 }

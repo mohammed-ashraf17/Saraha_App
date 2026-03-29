@@ -24,9 +24,14 @@ userRouter.post("/signIn",  validation(UV.signInSchema) , US.signIn)
 userRouter.get("/Profile" ,authentication, authorization({roles:[rolesEnum.user]}),US.getProfileUser)
 userRouter.get("/refresh-token" ,US.refresh_token)
 userRouter.get("/share-Profile/:userId" ,validation(UV.shareProfileSchema),US.share_Profile)
-userRouter.patch("/update-Profile",validation(UV.updateProfileSchema) ,authentication,US.update_Profile)
+userRouter.patch("/update-Profile",authentication ,validation(UV.updateProfileSchema) ,US.update_Profile)
 userRouter.patch("/update-Password",validation(UV.updatePasswordSchema) ,authentication,US.update_Password)
-userRouter.post("/logout",  authentication , US.logout)                                        
+userRouter.post("/logout",  authentication , US.logout)         
+userRouter.patch("/Confirme-Email", validation(UV.ConfirmeEmailSchema),US.confirmeEmail)    
+userRouter.post("/resend-Otp", validation(UV.resendOtpSchema),US.resendOtp)                                        
+
+
+
 
 
 export default userRouter

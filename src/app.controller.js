@@ -6,7 +6,6 @@ import successResponse from "./common/utils/successes_response/succsses.response
 import cors from "cors"
 import { PORT } from "../config/config.service.js"
 import { redisConnecition } from "./DB/redis/redis.db.js"
-import { keys, set, ttl } from "./DB/redis/redis.service.js"
 const app = express()
 const port = PORT
 
@@ -15,10 +14,12 @@ const bootstrap = async ()=>{
 
     app.use( cors(),express.json())
 
-    checkConnectionDB()
+    checkConnectionDB() 
     redisConnecition()
 
     // await set({key:"test" , value:"test" , ttl:60})
+    // await redisClient.set("name" , "mohammed")
+    // await redisClient.expire("name" , 60)
 
     app.use("/uploads" , express.static("uploads"))
 

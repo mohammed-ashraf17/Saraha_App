@@ -11,8 +11,52 @@ import {OAuth2Client} from 'google-auth-library';
 import cloudinary from "../../common/utils/cloudinary.js";
 import fs from "node:fs"
 import { ACCESS_SEUCRIT_KEY, PERFIX, REFRESH_SEUCRIT_KEY } from "../../../config/config.service.js";
-import revokeTokenModel from "../../DB/models/revokeToken.model.js";
-import { deleteKey, get, get_keys, keys, revoke_key, set } from "../../DB/redis/redis.service.js";
+import { block_otp_key, deleteKey, get, get_keys, incr, keys, max_otp_key, otp_key, revoke_key, set, ttl } from "../../DB/redis/redis.service.js";
+import { genrateOtp, sendEmail } from "../../common/utils/email/send.email.js";
+import { eventEmitter } from "../../common/utils/email/email.events.js";
+import { emailTempalet } from "../../common/utils/email/email.template.js";
+import { emailEnum } from "../../common/enum/email.enum.js";
+
+const sendEmailOtp = async (email)=>
+{
+    const isblocked = await ttl({key:block_otp_key({email})})
+    if(isblocked>0)
+    {
+        throw new Error(`Too many attempts. Try again after ${isblocked} seconds.` , {cause:401});
+        
+    }
+
+    const otpTTl = await ttl({key:otp_key({email})})
+    if(otpTTl>0)
+    {
+        throw new Error(`you can resend otp after ${otpTTl} seconds`);
+    }
+
+    const maxOtp = await get({key:max_otp_key({email})})
+    if(maxOtp>=3)
+    {
+        await set({key:block_otp_key({email}) , value:1 , ttl:60})
+        throw new Error(`you have exceeded the max number of tries`);
+        
+    }
+
+    const otp =await genrateOtp()
+    eventEmitter.emit(emailEnum.confirmeEmail , async ()=>
+{
+    await sendEmail({
+        to:email,
+        subject:"welcome to saraha app",
+        html:emailTempalet(otp)
+    })
+
+    await set({
+        key:otp_key({email}) ,
+        value:bcryptPssword({textPlan:`${otp}`}),
+        ttl:60 * 2  })
+
+        await incr({key:max_otp_key({email})})
+})
+}
 
 export const signUp = async (req , res , next)=>
 {
@@ -28,7 +72,11 @@ if(password !== cPassword){
     throw new Error("password is ValIde")
 }
 
-if(await db_service.findOne({model:userModel , check:{_id:userId , provider:providerEnum.system}})){
+if(await db_service.findOne({model:userModel , check:{
+    _id:userId ,
+    provider:providerEnum.system
+    
+    }})){
     throw new Error("User NOT F0UND" , {cause:404})
 }
 if(!req.file){
@@ -53,7 +101,26 @@ const user = await db_service.create({
         profilePicture:{secure_url , public_id}
     }
 })
+    const otp =await genrateOtp()
+    eventEmitter.emit(emailEnum.confirmeEmail , async()=>
+    {
+        await sendEmail({
+        to:email,
+        subject:"welcome to saraha app",
+        html:emailTempalet(otp)
+    })
 
+    await set({
+        key:otp_key({email}) ,
+        value:bcryptPssword({textPlan:`${otp}`}),
+        ttl:60 * 2  })
+
+        await set({
+            key:max_otp_key({email}),
+            value:1,
+            ttl:60*6
+        })
+    })
 successResponse({res , message:"done create User" , data:user})
 
 } catch (error) {
@@ -72,6 +139,53 @@ successResponse({res , message:"done create User" , data:user})
 
     next(error)
 }
+}
+
+
+export const confirmeEmail = async (req , res , next)=>
+{
+    const {email , code} = req.body
+    const otpValue =await get({key:otp_key({email})})
+    if(!otpValue)
+    {
+        throw new Error("otp Expired",{cause:404});
+    }
+
+    if(!comparePssword({textPlan:code ,cipertext :otpValue }))
+    {
+        throw new Error("inValid otp");   
+    }
+
+    const user = await db_service.findOneAndUpdate({
+        model:userModel,
+        check:{email , confirmed : {$exists:false} , provider:providerEnum.system},
+        update:{confirmed :true}
+    })
+    if(!user)
+    {
+        throw new Error("user not exisit");
+    }
+    await deleteKey({key:otp_key({email})})
+    successResponse({res , message:"email confirmed successfuiiy"})
+}
+
+export const resendOtp = async (req , res , next)=>
+{
+    const {email} = req.body
+
+    const user = await db_service.findOne({
+        model:userModel,
+        check:{email , confirmed:{$exists :false} , provider : providerEnum.system}
+    })
+    if(!user)
+    {
+        throw new Error("user not exist or already confirmed" , {cause:409});
+    }
+
+    await sendEmailOtp(email)
+
+        successResponse({res , message:"email confirmed successfuiiy"})
+
 }
 
 
@@ -118,7 +232,10 @@ const client = new OAuth2Client();
 export const signIn = async (req , res , next)=>
 {
     const { email , password} = req.body
-    const user = await db_service.findOne({model:userModel , check:{email , provider:providerEnum.system}})
+    const user = await db_service.findOne({model:userModel , check:{email ,
+        provider:providerEnum.system,
+        confirmed: {$exists: true}
+    }})
     if(!user)
     {
         throw new Error("Emali Already Exist or provider is not system" , {cause:403});
@@ -151,7 +268,7 @@ export const signIn = async (req , res , next)=>
 
 export const getProfileUser = async(req , res , next) => {
     try {
-        const key = `profile :: ${req.user._id}`;
+        const key = `profile::${req.user._id}`;
         const userExist = await get({key}); 
 
         if(userExist) {
@@ -230,7 +347,7 @@ export const share_Profile = async(req , res , next)=>
 
 export const update_Profile = async(req , res , next)=>
 {
-    let {userName , age , phone} = req.body
+    let {userName , age , phone ,gender} = req.body
 
     if(phone)
     {
@@ -239,7 +356,7 @@ export const update_Profile = async(req , res , next)=>
     const user = await db_service.findOneAndUpdate({
         model:userModel,
         check:{_id:req.user._id},
-        update:{userName , age , phone}
+        update:{userName , age , phone , gender}
     })
 
     if(!user)
@@ -247,7 +364,7 @@ export const update_Profile = async(req , res , next)=>
         throw new Error("user not found ", {cause:404});    
     }
     user.phone = decrypt(user.phone)
-    await deleteKey({key:`profile :: ${req.user._id}`})
+    await deleteKey({key:`profile::${req.user._id}`})
     successResponse({res , data:user})
 }
 
@@ -273,8 +390,8 @@ export const logout = async(req , res , next)=>
     {
         req.user.changeCredential = new Date()
         await req.user.save()
-        await deleteKey(await keys(get_keys({userId:req.user._id})))
-
+        const userKeys = await keys({pattern: get_keys({userId:req.user._id})})
+        await deleteKey({key: userKeys})
         // await db_service.deleteMany({model:revokeTokenModel,
         //     check:
         //     {

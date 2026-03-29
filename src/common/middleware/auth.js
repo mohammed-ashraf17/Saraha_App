@@ -28,7 +28,7 @@ export const authentication = async (req , res , next) => {
             throw new Error("Token Expired");
         }
 
-        const revokeToken = await get(revoke_key({userId:req.user._id, jti:req.decoded.jti}));
+        const revokeToken = await get({key:revoke_key({userId:req.user._id, jti:req.decoded.jti})});
         if(revokeToken) throw new Error("revokeToken Expired");
 
         next();
