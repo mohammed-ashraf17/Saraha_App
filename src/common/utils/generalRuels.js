@@ -1,5 +1,7 @@
 import joi from "joi"
 import { Types } from "mongoose"
+
+
 export const GeneralRules = {
             userName:joi.string().min(5).max(40),
             phone:joi.string().pattern(new RegExp(/^[0-9]{11}$/)),

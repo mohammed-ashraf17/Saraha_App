@@ -54,7 +54,7 @@ export const emailTempalet = (otp)=>
   </div>
 
   <p style="margin-top:20px; font-size:13px; color:#999;">
-    Sent anonymously • {{time}}
+    time : ${new Date()}
   </p>
 
 </td>
@@ -119,4 +119,23 @@ export const emailTempalet = (otp)=>
 
 </body>
 </html>`
+}
+
+export const emailTempaletLink = (link)=>
+{
+    return `
+        <div style="font-family: Arial, sans-serif; text-align: center; padding: 40px; background-color: #f7f7f7;">
+            <div style="max-width: 500px; margin: auto; background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <h2 style="color: #333;">Reset Your Password</h2>
+                <p style="color: #555;">Click the button below to reset your password. This link will expire in 10 minutes.</p>
+                <a href="${link}" 
+                style="display: inline-block; padding: 15px 25px; margin-top: 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                Reset Password
+                </a>
+                <p style="margin-top: 30px; color: #999; font-size: 12px;">
+                    If you did not request a password reset, please ignore this email.
+                </p>
+            </div>
+        </div>
+    `
 }

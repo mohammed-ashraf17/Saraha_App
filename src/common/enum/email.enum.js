@@ -1,4 +1,7 @@
+
+
 export const emailEnum =
 {
-    confirmeEmail:"confirmeEmail"
+    confirmeEmail:"confirmeEmail",
+    forgetPassword:"forgetPassword"
 }

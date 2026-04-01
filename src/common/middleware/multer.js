@@ -40,7 +40,7 @@ return upload
 
 export const  multer_host = ({ custom_typs = []}={})=>
 {
- const storage = multer.diskStorage({})
+const storage = multer.diskStorage({})
 
 function fileFilter (req, file, cb) {
 

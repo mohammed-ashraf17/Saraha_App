@@ -93,5 +93,48 @@ export const resendOtpSchema =
     ).required()
 }
 
+export const forgetPasswordSchema =
+{
+    body:joi.object(
+        {
+            email:GeneralRules.email.required(),
+        }
+    ).required()
+}
 
+export const resetPasswordSchema =
+{
+    body:joi.object(
+        {
+            email:GeneralRules.email.required(),
+            password:GeneralRules.password.required(),
+            cPassword: joi.string().valid(joi.ref("password")).required(),
+            code:joi.string().length(6).required()
+        }
+    ).required()
+}
 
+export const forgetPasswordLinkSchema =
+{
+    body:joi.object(
+        {
+            email:GeneralRules.email.required(),
+        }
+    ).required()
+}
+
+export const resetPasswordLinkSchema =
+{
+
+    body: joi.object({
+        password: GeneralRules.password.required(),
+
+        cPassword: joi.string()
+            .valid(joi.ref("password"))
+            .required()
+    }).required(),
+
+    params: joi.object({
+        token: joi.string().required()
+    }).required()
+}

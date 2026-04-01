@@ -13,6 +13,7 @@ dotenv.config({path:path.resolve(`config/${envPaths[NODE_ENV]}`)})
 
 export const PORT = +env.PORT
 export const DB_URI = env.DB_URI
+export const DB_URI_LOCAL = env.DB_URI_LOCAL
 export const ROUNDS = +env.ROUNDS
 export const CLOUD_NAME = env.CLOUD_NAME
 export const API_KEY = +env.API_KEY
@@ -23,6 +24,10 @@ export const PERFIX = env.PERFIX
 export const REDIS_URL = env.REDIS_URL
 export const EMAIL = env.EMAIL
 export const PASSWORD = env.PASSWORD
+export const WHITLIST = env.WHITLIST?.split(",") || []
+
+
+
 
 
 

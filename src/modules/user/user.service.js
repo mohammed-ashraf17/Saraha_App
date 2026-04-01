@@ -14,10 +14,10 @@ import { ACCESS_SEUCRIT_KEY, PERFIX, REFRESH_SEUCRIT_KEY } from "../../../config
 import { block_otp_key, deleteKey, get, get_keys, incr, keys, max_otp_key, otp_key, revoke_key, set, ttl } from "../../DB/redis/redis.service.js";
 import { genrateOtp, sendEmail } from "../../common/utils/email/send.email.js";
 import { eventEmitter } from "../../common/utils/email/email.events.js";
-import { emailTempalet } from "../../common/utils/email/email.template.js";
+import { emailTempalet, emailTempaletLink } from "../../common/utils/email/email.template.js";
 import { emailEnum } from "../../common/enum/email.enum.js";
 
-const sendEmailOtp = async (email)=>
+const sendEmailOtp = async ({email , subject} = {})=>
 {
     const isblocked = await ttl({key:block_otp_key({email})})
     if(isblocked>0)
@@ -26,13 +26,13 @@ const sendEmailOtp = async (email)=>
         
     }
 
-    const otpTTl = await ttl({key:otp_key({email})})
+    const otpTTl = await ttl({key:otp_key({email , subject})})
     if(otpTTl>0)
     {
         throw new Error(`you can resend otp after ${otpTTl} seconds`);
     }
 
-    const maxOtp = await get({key:max_otp_key({email})})
+    const maxOtp = await get({key:max_otp_key({email , subject})})
     if(maxOtp>=3)
     {
         await set({key:block_otp_key({email}) , value:1 , ttl:60})
@@ -50,7 +50,7 @@ const sendEmailOtp = async (email)=>
     })
 
     await set({
-        key:otp_key({email}) ,
+        key:otp_key({email , subject}) ,
         value:bcryptPssword({textPlan:`${otp}`}),
         ttl:60 * 2  })
 
@@ -111,7 +111,7 @@ const user = await db_service.create({
     })
 
     await set({
-        key:otp_key({email}) ,
+        key:otp_key({email , subject:emailEnum.confirmeEmail}) ,
         value:bcryptPssword({textPlan:`${otp}`}),
         ttl:60 * 2  })
 
@@ -165,7 +165,7 @@ export const confirmeEmail = async (req , res , next)=>
     {
         throw new Error("user not exisit");
     }
-    await deleteKey({key:otp_key({email})})
+    await deleteKey({key:otp_key({email , subject:emailEnum.confirmeEmail})})
     successResponse({res , message:"email confirmed successfuiiy"})
 }
 
@@ -182,7 +182,7 @@ export const resendOtp = async (req , res , next)=>
         throw new Error("user not exist or already confirmed" , {cause:409});
     }
 
-    await sendEmailOtp(email)
+    await sendEmailOtp({email , subject:emailEnum.confirmeEmail})
 
         successResponse({res , message:"email confirmed successfuiiy"})
 
@@ -379,6 +379,7 @@ export const update_Password = async(req , res , next)=>
     
     const hash = bcryptPssword({textPlan:newPassword})
     req.user.password = hash
+    req.user.changeCredential = new Date()
     await req.user.save()
     successResponse({res})
 }
@@ -415,4 +416,142 @@ export const logout = async(req , res , next)=>
         //     }})
     }
     successResponse({res})
+}
+
+export const forgetPassword = async (req , res , next)=>
+{
+    const { email } = req.body
+    const user = await db_service.findOne({model:userModel , check:{email ,
+        provider:providerEnum.system,
+        confirmed: {$exists: true}
+    }})
+    if(!user)
+    {
+        throw new Error("Emali Already Exist or provider is not system" , {cause:403});
+    }
+
+    await sendEmailOtp({email , subject:emailEnum.forgetPassword})
+    successResponse({res , message:"success"})
+}
+
+export const resetPassword = async (req , res , next)=>
+{
+    const { email , code , password } = req.body
+
+    const otpValue = await get({key : otp_key({email , subject:emailEnum.forgetPassword})})
+    if(!otpValue)
+    {
+        throw new Error("otp expire");
+    }
+
+    if(!comparePssword({textPlan:code ,cipertext:otpValue }))
+    {
+        throw new Error("inValid otp");
+    }
+
+    const user = await db_service.findOneAndUpdate({model:userModel , 
+        check:{email ,
+        provider:providerEnum.system,
+        confirmed: {$exists: true}
+    },
+    update:
+    {
+        password:bcryptPssword({textPlan:password}),
+        changeCredential: new Date()
+    }
+})
+    if(!user)
+    {
+        throw new Error("Emali Already Exist or provider is not system" , {cause:403});
+    }
+
+    await deleteKey({key:otp_key({email , subject:emailEnum.forgetPassword})})
+    successResponse({res , message:"success"})
+}
+
+export const forgetPasswordLink = async (req , res , next)=>
+{
+    const { email } = req.body
+
+    const user = await db_service.findOne({
+        model:userModel,
+        check:{
+            email,
+            provider:providerEnum.system,
+            confirmed: {$exists: true}
+        }
+    })
+
+    if(!user){
+        throw new Error("user not found", {cause:404})
+    }
+
+    const token = generateToken({
+        paylod:{ email },
+        seucrit:ACCESS_SEUCRIT_KEY,
+        options:{
+            expiresIn:"10m"
+        }
+    })
+
+    const link = `http://localhost:3001/forget-password-Link/${token}`
+
+    
+await sendEmail({
+    to: email,
+    subject: "Reset your password",
+    html: emailTempaletLink(link)
+})
+    await set({
+    key: `reset_token::${token}`,
+    value: 1,
+    ttl: 60 * 10
+    })
+
+    successResponse({res , message:"check your email"})
+}
+
+export const resetPasswordLink = async (req , res , next)=>
+{
+    const { token } = req.params
+    const { password } = req.body
+
+
+    const decoded = verifyToken({
+        token,
+        seucrit:ACCESS_SEUCRIT_KEY
+    })
+
+    if(!decoded?.email){
+        throw new Error("invalid token")
+    }
+
+
+    const tokenKey = `reset_token::${token}`
+
+    const exists = await get({key: tokenKey})
+    if(!exists){
+        throw new Error("token expired or already used")
+    }
+
+    const user = await db_service.findOneAndUpdate({
+        model:userModel,
+        check:{
+            email: decoded.email,
+            provider:providerEnum.system
+        },
+        update:{
+            password: bcryptPssword({textPlan:password}),
+            changeCredential: new Date()
+        }
+    })
+
+    if(!user){
+        throw new Error("user not found", {cause:404})
+    }
+
+    
+    await deleteKey({key: tokenKey})
+
+    successResponse({res , message:"password updated"})
 }
